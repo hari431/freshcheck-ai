@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isClearVisible, getInitialTheme, nextTheme } from "../src/uiHelpers.js";
+import { isClearVisible, getInitialTheme, nextTheme, isStaleRequest } from "../src/uiHelpers.js";
 
 test("Clear is visible when input has content", () => {
   assert.equal(isClearVisible("hello", null, "", false), true);
@@ -36,4 +36,9 @@ test("getInitialTheme defaults to light", () => {
 test("nextTheme toggles", () => {
   assert.equal(nextTheme("light"), "dark");
   assert.equal(nextTheme("dark"), "light");
+});
+
+test("stale request detection", () => {
+  assert.equal(isStaleRequest(2, 1), true);
+  assert.equal(isStaleRequest(1, 1), false);
 });

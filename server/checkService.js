@@ -163,7 +163,10 @@ function filterRelevantEvidence(claim, evidence) {
   if (!Array.isArray(evidence) || evidence.length === 0) return [];
   const anchors = subjectAnchors(claim);
   const claimTokens = new Set(significantTokens(claim));
+  const seen = new Set();
   return evidence.filter((e) => {
+    const url = e.url || "";
+    if (url && seen.has(url)) return false;
     const title = (e.title || "").toLowerCase();
     const text = `${e.title || ""} ${e.content || ""}`.toLowerCase();
     // Subject (proper noun) must appear in the title to be relevant.
@@ -173,7 +176,9 @@ function filterRelevantEvidence(claim, evidence) {
     }
     const evidenceTokens = significantTokens(text);
     const overlap = evidenceTokens.filter((t) => claimTokens.has(t)).length;
-    return overlap >= 1;
+    if (overlap < 1) return false;
+    if (url) seen.add(url);
+    return true;
   });
 }
 

@@ -20,6 +20,7 @@ export default function App() {
   const [checkedAt, setCheckedAt] = useState(null);
   const [theme, setTheme] = useState(() => getInitialTheme(typeof window !== "undefined" ? window.localStorage : null));
   const requestIdRef = useRef(0);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -40,12 +41,15 @@ export default function App() {
       return;
     }
     const thisRequest = ++requestIdRef.current;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setLoading(true);
     try {
       const res = await fetch("/api/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answer }),
+        signal: controller.signal,
       });
       const data = await res.json().catch(() => ({}));
       if (thisRequest !== requestIdRef.current) return;
@@ -68,6 +72,10 @@ export default function App() {
 
   function handleClear() {
     requestIdRef.current += 1;
+    if (abortControllerRef.current) {
+      try { abortControllerRef.current.abort(); } catch { /* ignore */ }
+      abortControllerRef.current = null;
+    }
     setAnswer("");
     setResult(null);
     setError("");
@@ -140,7 +148,7 @@ export default function App() {
               {loading ? "Checking…" : "Check Freshness"}
             </button>
             {showClear && (
-              <button type="button" className="btn-secondary" onClick={handleClear} disabled={loading}>
+              <button type="button" className="btn-secondary" onClick={handleClear}>
                 Clear
               </button>
             )}

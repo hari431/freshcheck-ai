@@ -15,3 +15,7 @@ export function getInitialTheme(storage) {
 export function nextTheme(theme) {
   return theme === "dark" ? "light" : "dark";
 }
+
+export function isStaleRequest(currentRequestId, requestRequestId) {
+  return currentRequestId !== requestRequestId;
+}
