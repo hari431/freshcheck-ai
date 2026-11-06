@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { isClearVisible, getInitialTheme, nextTheme } from "./uiHelpers.js";
 
 const STATUS_META = {
   Fresh: { className: "status-fresh", icon: "✓", label: "Fresh" },
@@ -17,6 +18,17 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [checkedAt, setCheckedAt] = useState(null);
+  const [theme, setTheme] = useState(() => getInitialTheme(typeof window !== "undefined" ? window.localStorage : null));
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    try {
+      window.localStorage.setItem("theme", theme);
+    } catch {
+      // ignore
+    }
+  }, [theme]);
 
   async function handleCheck(e) {
     e?.preventDefault();
@@ -27,6 +39,7 @@ export default function App() {
       setError("Please paste an answer to check.");
       return;
     }
+    const thisRequest = ++requestIdRef.current;
     setLoading(true);
     try {
       const res = await fetch("/api/check", {
@@ -35,19 +48,31 @@ export default function App() {
         body: JSON.stringify({ answer }),
       });
       const data = await res.json().catch(() => ({}));
+      if (thisRequest !== requestIdRef.current) return;
       if (!res.ok) {
         if (res.status >= 500) {
           throw new Error("Verification service is unavailable. Please try again later.");
         }
         throw new Error(data?.error || "Request failed.");
       }
+      if (thisRequest !== requestIdRef.current) return;
       setResult(data);
       setCheckedAt(new Date());
     } catch (err) {
+      if (thisRequest !== requestIdRef.current) return;
       setError(err?.message || "Something went wrong.");
     } finally {
-      setLoading(false);
+      if (thisRequest === requestIdRef.current) setLoading(false);
     }
+  }
+
+  function handleClear() {
+    requestIdRef.current += 1;
+    setAnswer("");
+    setResult(null);
+    setError("");
+    setCheckedAt(null);
+    setLoading(false);
   }
 
   const counts = result?.claims?.reduce(
@@ -60,8 +85,35 @@ export default function App() {
     { total: 0, Fresh: 0, Outdated: 0, Uncertain: 0, Unverified: 0 }
   );
 
+  const showClear = isClearVisible(answer, result, error, loading);
+
   return (
     <div className="page">
+      <div className="top-bar">
+        <div className="top-illustration" aria-hidden="true">
+          <svg viewBox="0 0 120 120" width="64" height="64">
+            <defs>
+              <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#2563eb" />
+                <stop offset="100%" stopColor="#7c3aed" />
+              </linearGradient>
+            </defs>
+            <circle cx="60" cy="60" r="54" fill="url(#g)" opacity="0.12" />
+            <circle cx="60" cy="60" r="40" fill="none" stroke="url(#g)" strokeWidth="2" />
+            <path d="M40 62 L54 76 L82 46" fill="none" stroke="url(#g)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="60" cy="60" r="6" fill="url(#g)" />
+          </svg>
+        </div>
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={() => setTheme((t) => nextTheme(t))}
+          aria-label="Toggle color theme"
+        >
+          {theme === "dark" ? "☀ Light" : "☾ Dark"}
+        </button>
+      </div>
+
       <header className="hero">
         <div className="hero-badge">AI Fact Verification</div>
         <h1>FreshCheck AI</h1>
@@ -83,9 +135,16 @@ export default function App() {
         />
         <div className="input-footer">
           <span className="char-count">{answer.trim().length} characters</span>
-          <button type="button" onClick={handleCheck} disabled={loading || !answer.trim()}>
-            {loading ? "Checking…" : "Check Freshness"}
-          </button>
+          <div className="button-row">
+            <button type="button" onClick={handleCheck} disabled={loading || !answer.trim()}>
+              {loading ? "Checking…" : "Check Freshness"}
+            </button>
+            {showClear && (
+              <button type="button" className="btn-secondary" onClick={handleClear} disabled={loading}>
+                Clear
+              </button>
+            )}
+          </div>
         </div>
         {error && <div className="error-banner">{error}</div>}
       </section>
